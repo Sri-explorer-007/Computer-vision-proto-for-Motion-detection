@@ -1,0 +1,2015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOTION GHOST LAB — Temporal Filtering & Frame Differencing</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* ==========================================================================
+           1. CORE DESIGN SYSTEM & STYLES
+           ========================================================================== */
+        :root {
+            --bg-dark: #060812;
+            --bg-card: rgba(14, 18, 36, 0.75);
+            --bg-card-hover: rgba(22, 28, 54, 0.85);
+            --border-glow: rgba(0, 240, 255, 0.25);
+            --border-purple: rgba(168, 85, 247, 0.3);
+            
+            --cyan-glow: #00f0ff;
+            --purple-glow: #a855f7;
+            --magenta-glow: #ec4899;
+            --amber-glow: #f59e0b;
+            --green-glow: #10b981;
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --font-title: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'Fira Code', monospace;
+            
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.05) 0%, transparent 40%),
+                linear-gradient(to bottom, rgba(6, 8, 18, 0.9), rgba(6, 8, 18, 0.95));
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(6, 8, 18, 0.8);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 240, 255, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 240, 255, 0.6);
+        }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glow);
+            border-radius: 14px;
+            box-shadow: var(--glass-shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-panel:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 10px 40px 0 rgba(0, 240, 255, 0.1);
+        }
+
+        /* Layout Container */
+        .app-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ==========================================================================
+           2. HEADER & BRANDING
+           ========================================================================== */
+        header.app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 28px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .brand-title-group h1 {
+            font-family: var(--font-title);
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #ffffff 30%, var(--cyan-glow) 70%, var(--purple-glow) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-title-group p.subtitle {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-style: italic;
+        }
+        .brand-title-group p.subtitle span.highlight {
+            color: var(--cyan-glow);
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* Buttons */
+        .btn {
+            font-family: var(--font-body);
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-cyan {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+        .btn-cyan:hover {
+            background: var(--cyan-glow);
+            color: #000;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+        }
+
+        .btn-purple {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: var(--purple-glow);
+            color: var(--purple-glow);
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+        }
+        .btn-purple:hover {
+            background: var(--purple-glow);
+            color: #fff;
+            box-shadow: 0 0 25px rgba(168, 85, 247, 0.5);
+        }
+
+        .btn-amber {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: var(--amber-glow);
+            color: var(--amber-glow);
+        }
+        .btn-amber:hover {
+            background: var(--amber-glow);
+            color: #000;
+        }
+
+        .btn-outline {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+        }
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        .btn-danger:hover {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Computer View Mode Glitch/Matrix Overlay */
+        body.computer-view-active {
+            filter: hue-rotate(90deg) contrast(1.2);
+        }
+        body.computer-view-active .glass-panel {
+            background: rgba(0, 20, 10, 0.9);
+            border-color: #00ff66;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.2);
+        }
+
+        /* ==========================================================================
+           3. PIPELINE VISUALIZER BAR
+           ========================================================================== */
+        .pipeline-bar {
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            overflow-x: auto;
+            gap: 12px;
+        }
+
+        .pipeline-title {
+            font-family: var(--font-title);
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        .pipeline-nodes {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-grow: 1;
+            justify-content: center;
+        }
+
+        .pipeline-node {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .pipeline-node.active {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+            transform: scale(1.04);
+        }
+
+        .pipeline-arrow {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* ==========================================================================
+           4. MAIN DASHBOARD GRID (2x2 CANVASES)
+           ========================================================================== */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .canvas-card {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .canvas-header {
+            padding: 14px 18px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .canvas-title {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--cyan-glow);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .canvas-card:nth-child(2) .canvas-title { color: var(--purple-glow); }
+        .canvas-card:nth-child(3) .canvas-title { color: var(--amber-glow); }
+        .canvas-card:nth-child(4) .canvas-title { color: var(--magenta-glow); }
+
+        .canvas-badge {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        canvas.view-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Overlay Reticle & Crosshair for Pixel Inspector */
+        .inspector-reticle {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 2px dashed var(--amber-glow);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            display: none;
+            box-shadow: 0 0 10px var(--amber-glow);
+            z-index: 10;
+        }
+        .inspector-reticle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: var(--amber-glow);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Live HUD overlay on canvas */
+        .canvas-hud {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(6, 8, 18, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-primary);
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+
+        /* ==========================================================================
+           5. MATH CORE & PARAMETERS SECTION
+           ========================================================================== */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1100px) {
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .math-card {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .section-heading {
+            font-family: var(--font-title);
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .formula-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-glow);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .formula-text {
+            font-family: var(--font-mono);
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--cyan-glow);
+            letter-spacing: 1px;
+        }
+
+        .formula-sub {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        /* Dynamic Animated Pixel Calculation Box */
+        .pixel-calc-demo {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .calc-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .calc-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .calc-val {
+            font-weight: 700;
+            font-size: 1.1rem;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .calc-val.prev { color: var(--purple-glow); border: 1px solid var(--purple-glow); }
+        .calc-val.curr { color: var(--cyan-glow); border: 1px solid var(--cyan-glow); }
+        .calc-val.diff { color: var(--amber-glow); border: 1px solid var(--amber-glow); }
+        .calc-val.status { color: var(--green-glow); border: 1px solid var(--green-glow); }
+
+        /* Sliders and Mode Controls */
+        .params-card {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .slider-val {
+            font-family: var(--font-mono);
+            color: var(--cyan-glow);
+            font-weight: 700;
+            background: rgba(0, 240, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--cyan-glow);
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--cyan-glow);
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .mode-button-group {
+            display: flex;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: var(--font-body);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        .mode-btn.active {
+            background: var(--cyan-glow);
+            color: #000;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+        }
+
+        /* ==========================================================================
+           6. EXPERIMENTAL LAB MODULES (TEMPORAL AVG, SUBTRACTION, WHO MOVED)
+           ========================================================================== */
+        .experiments-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        @media (max-width: 1100px) {
+            .experiments-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .exp-card {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .exp-title {
+            font-family: var(--font-title);
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--cyan-glow);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .exp-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 3px solid var(--amber-glow);
+            padding: 10px 12px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.8rem;
+            color: #fbbf24;
+            line-height: 1.4;
+        }
+
+        /* ==========================================================================
+           7. LIVE STATS & PIXEL TRACER GRAPH
+           ========================================================================== */
+        .stats-tracer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 20px;
+        }
+        @media (max-width: 1024px) {
+            .stats-tracer-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stats-card {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+        }
+        .stats-row span.label {
+            color: var(--text-secondary);
+        }
+        .stats-row span.val {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: var(--cyan-glow);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--cyan-glow), var(--magenta-glow));
+            border-radius: 5px;
+            transition: width 0.15s ease;
+            box-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        .tracer-card {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .tracer-canvas-container {
+            width: 100%;
+            height: 140px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ==========================================================================
+           8. TIMELINE & FOOTER EDUCATIONAL TAKEAWAYS
+           ========================================================================== */
+        .timeline-bar {
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .timeline-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            margin: 10px 0;
+        }
+
+        .timeline-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.15);
+            z-index: 1;
+        }
+
+        .timeline-step {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--bg-dark);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            position: relative;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-step.active {
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+            background: rgba(0, 240, 255, 0.15);
+            box-shadow: 0 0 15px var(--cyan-glow);
+            transform: scale(1.15);
+        }
+
+        .spatial-vs-temporal {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 14px;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        .takeaway-banner {
+            text-align: center;
+            padding: 28px;
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.08), rgba(168, 85, 247, 0.08));
+            border: 1px solid var(--border-glow);
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .takeaway-banner h2 {
+            font-family: var(--font-title);
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--cyan-glow);
+        }
+
+        .takeaway-banner p {
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            max-width: 800px;
+        }
+
+        .takeaway-tagline {
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--magenta-glow);
+            background: rgba(236, 72, 153, 0.15);
+            padding: 6px 18px;
+            border-radius: 20px;
+            border: 1px solid var(--magenta-glow);
+            margin-top: 6px;
+        }
+
+        /* ==========================================================================
+           9. QUIZ MODAL
+           ========================================================================== */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-backdrop.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .quiz-modal {
+            width: 90%;
+            max-width: 650px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+        }
+
+        .quiz-option {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 14px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        .quiz-option:hover {
+            background: rgba(0, 240, 255, 0.1);
+            border-color: var(--cyan-glow);
+        }
+        .quiz-option.correct {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--green-glow);
+            color: var(--green-glow);
+            font-weight: 600;
+        }
+        .quiz-option.incorrect {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+
+        <!-- ==========================================================================
+             HEADER SECTION
+             ========================================================================== -->
+        <header class="glass-panel app-header">
+            <div class="brand-title-group">
+                <h1>🔬 MOTION GHOST LAB</h1>
+                <p class="subtitle">“<span class="highlight">Don't teach the computer what motion is.</span> Show it what changed.”</p>
+            </div>
+            <div class="header-actions">
+                <button id="btnStartCamera" class="btn btn-cyan">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 10l5-5v14l-5-5M4 6h11a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"></path></svg>
+                    Start Camera
+                </button>
+                <button id="btnStopCamera" class="btn btn-danger" style="display: none;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+                    Stop Camera
+                </button>
+                <button id="btnSampleMotion" class="btn btn-purple">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    Try Sample Motion
+                </button>
+                <button id="btnComputerView" class="btn btn-outline">
+                    👁 Human View
+                </button>
+                <button id="btnQuiz" class="btn btn-amber">
+                    🎯 Challenge
+                </button>
+                <button id="btnReset" class="btn btn-outline btn-sm">
+                    Reset
+                </button>
+            </div>
+        </header>
+
+        <!-- ==========================================================================
+             PIPELINE VISUALIZER
+             ========================================================================== -->
+        <div class="glass-panel pipeline-bar">
+            <span class="pipeline-title">Visual Processing Pipeline:</span>
+            <div class="pipeline-nodes">
+                <div class="pipeline-node active" id="pNodeVideo">VIDEO INPUT</div>
+                <span class="pipeline-arrow">➔</span>
+                <div class="pipeline-node" id="pNodePrev">FRAME t−1</div>
+                <span class="pipeline-arrow">➔</span>
+                <div class="pipeline-node" id="pNodeCurr">FRAME t</div>
+                <span class="pipeline-arrow">➔</span>
+                <div class="pipeline-node" id="pNodeDiff">PIXEL DIFFERENCE</div>
+                <span class="pipeline-arrow">➔</span>
+                <div class="pipeline-node" id="pNodeThresh">THRESHOLD</div>
+                <span class="pipeline-arrow">➔</span>
+                <div class="pipeline-node" id="pNodeGhost">MOTION GHOST</div>
+                <span class="pipeline-arrow">➔</span>
+                <div class="pipeline-node" id="pNodeInfo">INFORMATION</div>
+            </div>
+        </div>
+
+        <!-- ==========================================================================
+             MAIN 2x2 DASHBOARD GRID
+             ========================================================================== -->
+        <div class="dashboard-grid">
+
+            <!-- PANEL 1: CURRENT FRAME -->
+            <div class="glass-panel canvas-card">
+                <div class="canvas-header">
+                    <span class="canvas-title">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle></svg>
+                        CURRENT FRAME — I(x,y,t)
+                    </span>
+                    <span class="canvas-badge" id="badgeCameraStatus">SYNTHETIC FEED</span>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="canvasCurrent" class="view-canvas"></canvas>
+                    <div class="canvas-hud">Target: Live Capture</div>
+                </div>
+            </div>
+
+            <!-- PANEL 2: PREVIOUS FRAME -->
+            <div class="glass-panel canvas-card">
+                <div class="canvas-header">
+                    <span class="canvas-title">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        PREVIOUS FRAME — I(x,y,t−1)
+                    </span>
+                    <span class="canvas-badge">t - 1 Frame Buffer</span>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="canvasPrevious" class="view-canvas"></canvas>
+                    <div class="canvas-hud">Delayed by 1 Frame</div>
+                </div>
+            </div>
+
+            <!-- PANEL 3: FRAME DIFFERENCE -->
+            <div class="glass-panel canvas-card">
+                <div class="canvas-header">
+                    <span class="canvas-title">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 12H6"></path></svg>
+                        FRAME DIFFERENCE — |I(t) − I(t−1)|
+                    </span>
+                    <span class="canvas-badge" style="color: var(--amber-glow); border-color: var(--amber-glow);">Hover for Inspector 🔍</span>
+                </div>
+                <div class="canvas-container" id="diffCanvasWrapper">
+                    <canvas id="canvasDifference" class="view-canvas"></canvas>
+                    <div class="inspector-reticle" id="inspectorReticle"></div>
+                    <div class="canvas-hud" id="hudDiffText">Abs Difference Map</div>
+                </div>
+            </div>
+
+            <!-- PANEL 4: MOTION GHOST -->
+            <div class="glass-panel canvas-card">
+                <div class="canvas-header">
+                    <span class="canvas-title">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        MOTION GHOST — DETECTED CHANGE
+                    </span>
+                    <div class="mode-button-group" style="padding: 2px;">
+                        <button class="mode-btn active" id="btnGhostCyan" style="padding: 3px 8px; font-size: 0.75rem;">Ghost</button>
+                        <button class="mode-btn" id="btnGhostHeatmap" style="padding: 3px 8px; font-size: 0.75rem;">Heatmap</button>
+                        <button class="mode-btn" id="btnGhostBinary" style="padding: 3px 8px; font-size: 0.75rem;">Binary</button>
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="canvasGhost" class="view-canvas"></canvas>
+                    <div class="canvas-hud" id="hudGhostStatus">Thresholded Output</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ==========================================================================
+             MATHEMATICAL CORE & PARAMETERS
+             ========================================================================== -->
+        <div class="controls-grid">
+
+            <!-- MATH ENGINE CARD -->
+            <div class="glass-panel math-card">
+                <div class="section-heading">
+                    <span>📐</span> The Mathematical Engine
+                </div>
+
+                <div class="formula-box">
+                    <div class="formula-text" id="mathFormulaText">D(x,y,t) = |I(x,y,t) − I(x,y,t−1)|</div>
+                    <div class="formula-sub">Current Pixel Intensity − Previous Pixel Intensity = Temporal Change</div>
+                </div>
+
+                <!-- Live Dynamic Pixel Inspector Readout -->
+                <div class="pixel-calc-demo">
+                    <div class="calc-node">
+                        <span class="calc-label">Inspect Coordinates</span>
+                        <span class="calc-val" id="calcPos" style="color: var(--cyan-glow); font-size: 0.9rem;">(X: 160, Y: 120)</span>
+                    </div>
+                    <div class="calc-node">
+                        <span class="calc-label">Previous I(t-1)</span>
+                        <span class="calc-val prev" id="calcPrev">80</span>
+                    </div>
+                    <div class="calc-node">
+                        <span class="calc-label">Current I(t)</span>
+                        <span class="calc-val curr" id="calcCurr">145</span>
+                    </div>
+                    <div class="calc-node">
+                        <span class="calc-label">Difference |Δ|</span>
+                        <span class="calc-val diff" id="calcDiff">65</span>
+                    </div>
+                    <div class="calc-node">
+                        <span class="calc-label">Classification</span>
+                        <span class="calc-val status" id="calcStatus">MOTION</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARAMETERS CARD -->
+            <div class="glass-panel params-card">
+                <div class="section-heading">
+                    <span>🎛️</span> Threshold & Filtering Parameters
+                </div>
+
+                <!-- Threshold Slider -->
+                <div class="control-group">
+                    <div class="control-header">
+                        <span>MOTION THRESHOLD (T)</span>
+                        <span class="slider-val" id="valThreshold">35</span>
+                    </div>
+                    <input type="range" id="rangeThreshold" min="0" max="255" value="35">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+                        <span>0 (Low - High Sensitivity/Noise)</span>
+                        <span>255 (High - Suppress Small Changes)</span>
+                    </div>
+                </div>
+
+                <!-- Active Experiment Mode Selector Tabs -->
+                <div class="control-group">
+                    <div class="control-header">
+                        <span>PROCESSING ALGORITHM MODE</span>
+                    </div>
+                    <div class="mode-button-group">
+                        <button class="mode-btn active" id="tabFrameDiff">Frame Difference</button>
+                        <button class="mode-btn" id="tabTemporalAvg">Temporal Average</button>
+                        <button class="mode-btn" id="tabBgSubtract">Background Subtraction</button>
+                        <button class="mode-btn" id="tabOpticalFlow">Optical Flow Demo</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ==========================================================================
+             EXPERIMENTAL MODULES
+             ========================================================================== -->
+        <div class="experiments-grid">
+
+            <!-- MODULE 1: TEMPORAL AVERAGING -->
+            <div class="glass-panel exp-card">
+                <div class="exp-title">
+                    <span>⏳ Temporal Averaging</span>
+                    <span class="canvas-badge">Noise Reduction</span>
+                </div>
+                <div class="formula-box" style="padding: 10px;">
+                    <div class="formula-text" style="font-size: 1rem; color: var(--purple-glow);">Iₜ = α Iₜ + (1−α) Iₜ₋₁</div>
+                </div>
+                <div class="control-group">
+                    <div class="control-header">
+                        <span>α — Temporal Weight</span>
+                        <span class="slider-val" id="valAlpha" style="color: var(--purple-glow);">0.25</span>
+                    </div>
+                    <input type="range" id="rangeAlpha" min="0.01" max="1.0" step="0.01" value="0.25">
+                </div>
+                <p class="exp-desc">
+                    Combines multiple frames across time to smooth random sensor noise and produce temporal motion motion-trails.
+                </p>
+            </div>
+
+            <!-- MODULE 2: WHO MOVED? CAMERA VS OBJECT -->
+            <div class="glass-panel exp-card">
+                <div class="exp-title">
+                    <span>🕵️ “Who Moved?” Experiment</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-outline btn-sm" id="btnSimObjectMove" style="flex: 1;">Object Move</button>
+                    <button class="btn btn-outline btn-sm" id="btnSimCamMove" style="flex: 1;">Camera Shake</button>
+                </div>
+                <div class="warning-box">
+                    ⚠️ <strong>Crucial Lesson:</strong> Frame difference alone detects <em>pixel intensity change</em>, not cause. Camera motion causes global frame differences!
+                </div>
+                <div id="whoMovedStatus" style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--cyan-glow);">
+                    Status: Monitoring spatial distribution...
+                </div>
+            </div>
+
+            <!-- MODULE 3: BACKGROUND SUBTRACTION -->
+            <div class="glass-panel exp-card">
+                <div class="exp-title">
+                    <span>🖼️ Background Subtraction</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-cyan btn-sm" id="btnCapBg" style="flex: 1;">Capture BG</button>
+                    <button class="btn btn-outline btn-sm" id="btnResetBg" style="flex: 1;">Reset BG</button>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: var(--text-secondary);">Foreground Detected:</span>
+                    <span id="fgDetectedBadge" class="canvas-badge" style="color: var(--green-glow); border-color: var(--green-glow);">YES (12.4%)</span>
+                </div>
+                <p class="exp-desc">
+                    Compares current frame against a frozen background standard to isolate stationary objects vs new intrusions.
+                </p>
+            </div>
+
+        </div>
+
+        <!-- ==========================================================================
+             LIVE STATS & PIXEL TIME-SERIES TRACER
+             ========================================================================== -->
+        <div class="stats-tracer-grid">
+
+            <!-- LIVE MOTION STATS -->
+            <div class="glass-panel stats-card">
+                <div class="section-heading">
+                    <span>📊</span> Live Motion Statistics
+                </div>
+
+                <div class="stats-row">
+                    <span class="label">Changed Pixels:</span>
+                    <span class="val" id="statChangedPixels">14,210</span>
+                </div>
+                <div class="stats-row">
+                    <span class="label">Motion Coverage:</span>
+                    <span class="val" id="statMotionPercent">11.4%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="barMotionPercent" style="width: 11.4%;"></div>
+                </div>
+
+                <div class="stats-row" style="margin-top: 6px;">
+                    <span class="label">Active Threshold (T):</span>
+                    <span class="val" id="statThreshold">35</span>
+                </div>
+                <div class="stats-row">
+                    <span class="label">Motion State:</span>
+                    <span class="val" id="statMotionState" style="color: var(--green-glow);">MOTION DETECTED</span>
+                </div>
+                <div class="stats-row">
+                    <span class="label">Frame Processing Rate:</span>
+                    <span class="val" id="statFPS">60 FPS</span>
+                </div>
+            </div>
+
+            <!-- PIXEL INTENSITY TRACER GRAPH -->
+            <div class="glass-panel tracer-card">
+                <div class="section-heading" style="justify-content: space-between;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <span>🔬</span> Pixel Temporal Intensity Waveform
+                    </span>
+                    <button class="btn btn-cyan btn-sm" id="btnTracePixel">Trace Selected Pixel</button>
+                </div>
+
+                <div class="tracer-canvas-container">
+                    <canvas id="canvasTracer" style="width: 100%; height: 100%; display: block;"></canvas>
+                </div>
+
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: -4px;">
+                    Plotting pixel intensity I(x,y) over the past 50 frames. A flat line represents a static scene; sharp spikes indicate object motion.
+                </p>
+            </div>
+
+        </div>
+
+        <!-- ==========================================================================
+             TIMELINE & SPATIAL VS TEMPORAL COMPARISON
+             ========================================================================== -->
+        <div class="glass-panel timeline-bar">
+            <div class="section-heading">
+                <span>⏱️</span> Frame Sequence Timeline
+            </div>
+
+            <div class="timeline-steps">
+                <div class="timeline-line"></div>
+                <div class="timeline-step">t−2</div>
+                <div class="timeline-step">t−1</div>
+                <div class="timeline-step active" id="stepCurr">t</div>
+                <div class="timeline-step">t+1</div>
+            </div>
+
+            <div class="spatial-vs-temporal">
+                <div>
+                    <strong style="color: var(--cyan-glow);">SPATIAL FILTERING:</strong><br>
+                    Analyzes neighboring pixels in the same frame.<br>
+                    <code style="color: var(--text-secondary);">Pixel(x-1, y) ↔ Pixel(x, y) ↔ Pixel(x+1, y)</code>
+                </div>
+                <div>
+                    <strong style="color: var(--purple-glow);">TEMPORAL FILTERING:</strong><br>
+                    Analyzes the same pixel across consecutive time points.<br>
+                    <code style="color: var(--text-secondary);">Frame(t-1)[x,y] ➔ Frame(t)[x,y] ➔ Frame(t+1)[x,y]</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================================================
+             DYNAMIC EDUCATIONAL EXPLANATION & TAKEAWAY
+             ========================================================================== -->
+        <div class="takeaway-banner">
+            <h2>“A computer doesn't need to understand motion first.”</h2>
+            <p id="dynamicEduExplanation">
+                By taking the absolute difference of pixel values between time t and time t-1, we strip away all static background texture and reveal pure temporal motion.
+            </p>
+            <div class="takeaway-tagline">
+                VIDEO ➔ DIFFERENCE ➔ THRESHOLD ➔ MOTION GHOST ➔ INFORMATION
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                Pixels don't see motion. Pixels measure change.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- ==========================================================================
+         CLASSROOM CHALLENGE QUIZ MODAL
+         ========================================================================== -->
+    <div class="modal-backdrop" id="quizModal">
+        <div class="glass-panel quiz-modal">
+            <div class="section-heading" style="justify-content: space-between;">
+                <span style="color: var(--amber-glow);">🎯 Classroom Challenge Question</span>
+                <button class="btn btn-outline btn-sm" id="btnCloseQuiz">Close ✖</button>
+            </div>
+
+            <div id="quizQuestionText" style="font-size: 1.1rem; font-weight: 600; line-height: 1.4;">
+                If nothing moves in front of the camera, what should the difference image look like?
+            </div>
+
+            <div id="quizOptionsContainer" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Options injected via JavaScript -->
+            </div>
+
+            <div id="quizFeedback" style="font-family: var(--font-mono); font-size: 0.9rem; padding: 10px; border-radius: 6px; display: none;"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <span id="quizScoreText" style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-secondary);">Score: 0 / 0</span>
+                <button class="btn btn-cyan btn-sm" id="btnNextQuiz">Next Question ➔</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==========================================================================
+         JAVASCRIPT ENGINE: CANVAS PROCESSING, WEBCAM & IMAGE PROCESSING
+         ========================================================================== -->
+    <script>
+        /**
+         * MOTION GHOST LAB - Core Engine
+         * Implements low-latency HTML5 Canvas Image Processing for Temporal Filtering:
+         * 1. Grayscale Conversion
+         * 2. Absolute Frame Difference |I(t) - I(t-1)|
+         * 3. Binary & Heatmap Motion Thresholding
+         * 4. Exponential Temporal Averaging
+         * 5. Background Subtraction
+         * 6. Synthetic Motion Vectors (Optical Flow concept demo)
+         * 7. Synthetic Classroom Video Stream Fallback
+         */
+
+        // Pipeline Elements
+        const canvasCurrent = document.getElementById('canvasCurrent');
+        const canvasPrevious = document.getElementById('canvasPrevious');
+        const canvasDifference = document.getElementById('canvasDifference');
+        const canvasGhost = document.getElementById('canvasGhost');
+        const canvasTracer = document.getElementById('canvasTracer');
+
+        const ctxCurr = canvasCurrent.getContext('2d', { willReadFrequently: true });
+        const ctxPrev = canvasPrevious.getContext('2d', { willReadFrequently: true });
+        const ctxDiff = canvasDifference.getContext('2d', { willReadFrequently: true });
+        const ctxGhost = canvasGhost.getContext('2d', { willReadFrequently: true });
+        const ctxTracer = canvasTracer.getContext('2d');
+
+        // Internal Offscreen Canvas Buffers (Processing resolution: 320x240 for 60fps performance)
+        const PROC_W = 320;
+        const PROC_H = 240;
+
+        const offCanvasCurr = document.createElement('canvas');
+        const offCanvasPrev = document.createElement('canvas');
+        const offCanvasBg = document.createElement('canvas');
+        
+        offCanvasCurr.width = PROC_W; offCanvasCurr.height = PROC_H;
+        offCanvasPrev.width = PROC_W; offCanvasPrev.height = PROC_H;
+        offCanvasBg.width = PROC_W; offCanvasBg.height = PROC_H;
+
+        const offCtxCurr = offCanvasCurr.getContext('2d', { willReadFrequently: true });
+        const offCtxPrev = offCanvasPrev.getContext('2d', { willReadFrequently: true });
+        const offCtxBg = offCanvasBg.getContext('2d', { willReadFrequently: true });
+
+        // Hidden Video Element for WebRTC Stream
+        const videoElement = document.createElement('video');
+        videoElement.autoplay = true;
+        videoElement.playsInline = true;
+
+        // State Flags & Variables
+        let isWebcamActive = false;
+        let isSampleMode = true;
+        let isComputerView = false;
+        let activeMode = 'framediff'; // 'framediff', 'temporalavg', 'bgsubtract', 'opticalflow'
+        let ghostStyle = 'cyan'; // 'cyan', 'heatmap', 'binary'
+
+        let thresholdValue = 35;
+        let alphaValue = 0.25;
+        let hasCapturedBg = false;
+
+        let frameCount = 0;
+        let lastFpsTime = performance.now();
+        let currentFps = 60;
+
+        // Inspector State
+        let inspectX = 160;
+        let inspectY = 120;
+        const pixelHistory = new Array(50).fill(128); // 50-frame history for tracer graph
+
+        // Heatmap Color Lookup Table (JET/Inferno Palette pre-computed for 256 levels)
+        const heatmapLUT = new Uint8Array(256 * 3);
+        (function precomputeHeatmapLUT() {
+            for (let i = 0; i < 256; i++) {
+                let v = i / 255.0;
+                // Jet-like smooth heatmap gradient
+                let r = Math.min(255, Math.max(0, 255 * (1.5 - Math.abs(v * 4 - 3))));
+                let g = Math.min(255, Math.max(0, 255 * (1.5 - Math.abs(v * 4 - 2))));
+                let b = Math.min(255, Math.max(0, 255 * (1.5 - Math.abs(v * 4 - 1))));
+                heatmapLUT[i * 3] = r;
+                heatmapLUT[i * 3 + 1] = g;
+                heatmapLUT[i * 3 + 2] = b;
+            }
+        })();
+
+        /* ==========================================================================
+           WEBCAM & SYNTHETIC FEED GENERATOR
+           ========================================================================== */
+        
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
+                    audio: false
+                });
+                videoElement.srcObject = stream;
+                await videoElement.play();
+                isWebcamActive = true;
+                isSampleMode = false;
+                
+                document.getElementById('btnStartCamera').style.display = 'none';
+                document.getElementById('btnStopCamera').style.display = 'inline-flex';
+                document.getElementById('badgeCameraStatus').innerText = 'LIVE WEBCAM';
+                document.getElementById('badgeCameraStatus').style.color = 'var(--cyan-glow)';
+            } catch (err) {
+                console.warn("Webcam unavailable or permission denied. Falling back to Synthetic Sample Mode:", err);
+                startSampleMode();
+                alert("Webcam permission unavailable. Switched seamlessly to Synthetic Educational Sample Mode!");
+            }
+        }
+
+        function stopWebcam() {
+            if (videoElement.srcObject) {
+                videoElement.srcObject.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+            }
+            isWebcamActive = false;
+            startSampleMode();
+            document.getElementById('btnStartCamera').style.display = 'inline-flex';
+            document.getElementById('btnStopCamera').style.display = 'none';
+        }
+
+        function startSampleMode() {
+            isSampleMode = true;
+            document.getElementById('badgeCameraStatus').innerText = 'SYNTHETIC FEED';
+            document.getElementById('badgeCameraStatus').style.color = 'var(--purple-glow)';
+        }
+
+        // Synthetic Demo Scene Parameters
+        let simBallX = 50;
+        let simBallY = 120;
+        let simBallVx = 3;
+        let simBallVy = 2;
+        let simHandAngle = 0;
+        let simCamShakeX = 0;
+
+        function renderSyntheticFrame(ctx, width, height) {
+            // Dark classroom studio background
+            ctx.fillStyle = '#0a0d1a';
+            ctx.fillRect(0, 0, width, height);
+
+            // Grid background texture
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < width; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+            }
+            for (let y = 0; y < height; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+            }
+
+            // Static background poster
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(20 + simCamShakeX, 30, 70, 90);
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(30 + simCamShakeX, 45, 50, 10);
+            ctx.fillRect(30 + simCamShakeX, 65, 30, 8);
+
+            // Bouncing Bright Object
+            simBallX += simBallVx;
+            simBallY += simBallVy;
+            if (simBallX < 30 || simBallX > width - 30) simBallVx *= -1;
+            if (simBallY < 30 || simBallY > height - 30) simBallVy *= -1;
+
+            ctx.shadowColor = '#00f0ff';
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#00f0ff';
+            ctx.beginPath();
+            ctx.arc(simBallX + simCamShakeX, simBallY, 20, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Waving Hand Silhouette
+            simHandAngle += 0.08;
+            let handY = height - 60 + Math.sin(simHandAngle) * 25;
+            let handX = width - 100;
+
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.ellipse(handX + simCamShakeX, handY, 25, 45, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hand Fingers
+            for (let i = -2; i <= 2; i++) {
+                ctx.beginPath();
+                ctx.ellipse(handX + i * 10 + simCamShakeX, handY - 40 + Math.abs(i) * 4, 5, 18, i * 0.1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Apply camera shake if simulated
+            if (simCamShakeX !== 0) {
+                simCamShakeX *= -0.5; // Dampen camera shake
+            }
+        }
+
+        /* ==========================================================================
+           CORE IMAGE PROCESSING PIPELINE
+           ========================================================================== */
+
+        let prevFrameData = null;
+        let temporalAvgData = null;
+
+        function processFrame() {
+            // 1. Capture current frame into PROC_W x PROC_H canvas
+            if (isWebcamActive && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                offCtxCurr.save();
+                // Mirror webcam stream horizontally for natural interaction
+                offCtxCurr.translate(PROC_W, 0);
+                offCtxCurr.scale(-1, 1);
+                offCtxCurr.drawImage(videoElement, 0, 0, PROC_W, PROC_H);
+                offCtxCurr.restore();
+            } else {
+                renderSyntheticFrame(offCtxCurr, PROC_W, PROC_H);
+            }
+
+            const currImgData = offCtxCurr.getImageData(0, 0, PROC_W, PROC_H);
+            const currPixels = currImgData.data;
+
+            // Initialize prevFrameData if empty
+            if (!prevFrameData) {
+                prevFrameData = offCtxCurr.getImageData(0, 0, PROC_W, PROC_H);
+            }
+            const prevPixels = prevFrameData.data;
+
+            // Prepare buffers for outputs
+            const diffImgData = offCtxCurr.createImageData(PROC_W, PROC_H);
+            const ghostImgData = offCtxCurr.createImageData(PROC_W, PROC_H);
+            
+            const diffPixels = diffImgData.data;
+            const ghostPixels = ghostImgData.data;
+
+            let changedPixelCount = 0;
+            const totalPixels = PROC_W * PROC_H;
+
+            // Initialize Temporal Average buffer
+            if (!temporalAvgData) {
+                temporalAvgData = new Float32Array(PROC_W * PROC_H * 4);
+                for (let i = 0; i < currPixels.length; i++) temporalAvgData[i] = currPixels[i];
+            }
+
+            // Get background pixel data if captured
+            const bgPixels = hasCapturedBg ? offCtxBg.getImageData(0, 0, PROC_W, PROC_H).data : null;
+
+            // ----------------------------------------------------------------------
+            // PIXEL-BY-PIXEL PROCESSING LOOP (ULTRA-FAST)
+            // ----------------------------------------------------------------------
+            for (let i = 0; i < currPixels.length; i += 4) {
+                // Convert Current Pixel to Grayscale Intensity (Luminance weights)
+                const currGray = 0.299 * currPixels[i] + 0.587 * currPixels[i + 1] + 0.114 * currPixels[i + 2];
+                
+                let compareGray = 0;
+                
+                if (activeMode === 'bgsubtract' && bgPixels) {
+                    compareGray = 0.299 * bgPixels[i] + 0.587 * bgPixels[i + 1] + 0.114 * bgPixels[i + 2];
+                } else {
+                    compareGray = 0.299 * prevPixels[i] + 0.587 * prevPixels[i + 1] + 0.114 * prevPixels[i + 2];
+                }
+
+                // Mathematical Core: D(x,y,t) = |I(x,y,t) - I(x,y,t-1)|
+                let diffVal = Math.abs(currGray - compareGray);
+
+                // Populate Difference Image Buffer
+                diffPixels[i]     = diffVal;
+                diffPixels[i + 1] = diffVal;
+                diffPixels[i + 2] = diffVal;
+                diffPixels[i + 3] = 255;
+
+                // Thresholding Step: D > T ? Motion Ghost : Static
+                let isMotion = diffVal >= thresholdValue;
+                if (isMotion) changedPixelCount++;
+
+                // Render Motion Ghost depending on style toggle
+                if (ghostStyle === 'cyan') {
+                    if (isMotion) {
+                        ghostPixels[i]     = 0;     // R
+                        ghostPixels[i + 1] = 240;   // G (Neon Cyan)
+                        ghostPixels[i + 2] = 255;   // B
+                        ghostPixels[i + 3] = Math.min(255, diffVal * 3); // Glow intensity
+                    } else {
+                        ghostPixels[i + 3] = 255; // Dark static background
+                    }
+                } else if (ghostStyle === 'heatmap') {
+                    // Color mapping via Heatmap LUT
+                    let lutIdx = Math.min(255, Math.floor(diffVal * (255 / (thresholdValue || 1))));
+                    ghostPixels[i]     = heatmapLUT[lutIdx * 3];
+                    ghostPixels[i + 1] = heatmapLUT[lutIdx * 3 + 1];
+                    ghostPixels[i + 2] = heatmapLUT[lutIdx * 3 + 2];
+                    ghostPixels[i + 3] = 255;
+                } else if (ghostStyle === 'binary') {
+                    let binaryVal = isMotion ? 255 : 0;
+                    ghostPixels[i]     = binaryVal;
+                    ghostPixels[i + 1] = binaryVal;
+                    ghostPixels[i + 2] = binaryVal;
+                    ghostPixels[i + 3] = 255;
+                }
+
+                // Exponential Moving Temporal Average: I_avg = alpha * I_curr + (1-alpha) * I_avg
+                temporalAvgData[i]     = alphaValue * currPixels[i]     + (1 - alphaValue) * temporalAvgData[i];
+                temporalAvgData[i + 1] = alphaValue * currPixels[i + 1] + (1 - alphaValue) * temporalAvgData[i + 1];
+                temporalAvgData[i + 2] = alphaValue * currPixels[i + 2] + (1 - alphaValue) * temporalAvgData[i + 2];
+                temporalAvgData[i + 3] = 255;
+            }
+
+            // ----------------------------------------------------------------------
+            // RENDER TO DISPLAY CANVASES
+            // ----------------------------------------------------------------------
+            
+            // Set Display Canvases Resolution once
+            if (canvasCurrent.width !== PROC_W) {
+                [canvasCurrent, canvasPrevious, canvasDifference, canvasGhost].forEach(c => {
+                    c.width = PROC_W; c.height = PROC_H;
+                });
+            }
+
+            // Panel 1: Current Frame or Computer View
+            if (isComputerView) {
+                // Computer View: Edge/Difference emphasized view
+                ctxCurr.putImageData(diffImgData, 0, 0);
+            } else if (activeMode === 'temporalavg') {
+                // Render Temporally Averaged Frame
+                const tempImg = ctxCurr.createImageData(PROC_W, PROC_H);
+                for (let k = 0; k < tempImg.data.length; k++) tempImg.data[k] = temporalAvgData[k];
+                ctxCurr.putImageData(tempImg, 0, 0);
+            } else {
+                ctxCurr.putImageData(currImgData, 0, 0);
+            }
+
+            // Panel 2: Previous Frame
+            ctxPrev.putImageData(prevFrameData, 0, 0);
+
+            // Panel 3: Difference Image
+            ctxDiff.putImageData(diffImgData, 0, 0);
+
+            // Panel 4: Motion Ghost
+            ctxGhost.putImageData(ghostImgData, 0, 0);
+
+            // Optical Flow Concept Overlay Mode
+            if (activeMode === 'opticalflow') {
+                drawOpticalFlowVectors(ctxGhost, diffPixels, PROC_W, PROC_H);
+            }
+
+            // Update Inspector Readout & Single Pixel Tracer
+            updatePixelInspectorData(currPixels, prevPixels, diffPixels);
+            updatePixelTracerGraph();
+
+            // Store current frame into prevFrameBuffer for next iteration
+            offCtxPrev.putImageData(currImgData, 0, 0);
+            prevFrameData = offCtxPrev.getImageData(0, 0, PROC_W, PROC_H);
+
+            // Update Motion Statistics & HUD
+            updateLiveStats(changedPixelCount, totalPixels);
+
+            // Loop animation via requestAnimationFrame
+            frameCount++;
+            calculateFPS();
+            requestAnimationFrame(processFrame);
+        }
+
+        /* ==========================================================================
+           OPTICAL FLOW CONCEPT DEMO (VECTOR ESTIMATION)
+           ========================================================================== */
+        function drawOpticalFlowVectors(ctx, diffPixels, width, height) {
+            ctx.strokeStyle = '#00f0ff';
+            ctx.fillStyle = '#00f0ff';
+            ctx.lineWidth = 1.5;
+
+            const blockSize = 16;
+            for (let y = blockSize; y < height - blockSize; y += blockSize) {
+                for (let x = blockSize; x < width - blockSize; x += blockSize) {
+                    let idx = (y * width + x) * 4;
+                    let diffVal = diffPixels[idx];
+
+                    if (diffVal > thresholdValue) {
+                        // Estimate direction gradient from surrounding pixels
+                        let idxRight = (y * width + (x + 4)) * 4;
+                        let idxDown = ((y + 4) * width + x) * 4;
+                        
+                        let dx = (diffPixels[idxRight] - diffVal) * 0.2;
+                        let dy = (diffPixels[idxDown] - diffVal) * 0.2;
+
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x + dx * 3, y + dy * 3);
+                        ctx.stroke();
+
+                        // Arrow head
+                        ctx.beginPath();
+                        ctx.arc(x + dx * 3, y + dy * 3, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        /* ==========================================================================
+           PIXEL INSPECTOR & TIME-SERIES TRACER
+           ========================================================================== */
+        function updatePixelInspectorData(currPixels, prevPixels, diffPixels) {
+            let clampedX = Math.max(0, Math.min(PROC_W - 1, inspectX));
+            let clampedY = Math.max(0, Math.min(PROC_H - 1, inspectY));
+            let idx = (clampedY * PROC_W + clampedX) * 4;
+
+            let prevVal = Math.round(0.299 * prevPixels[idx] + 0.587 * prevPixels[idx+1] + 0.114 * prevPixels[idx+2]);
+            let currVal = Math.round(0.299 * currPixels[idx] + 0.587 * currPixels[idx+1] + 0.114 * currPixels[idx+2]);
+            let diffVal = Math.abs(currVal - prevVal);
+            let isMotion = diffVal >= thresholdValue;
+
+            document.getElementById('calcPos').innerText = `(X: ${clampedX}, Y: ${clampedY})`;
+            document.getElementById('calcPrev').innerText = prevVal;
+            document.getElementById('calcCurr').innerText = currVal;
+            document.getElementById('calcDiff').innerText = diffVal;
+            
+            const statusBadge = document.getElementById('calcStatus');
+            statusBadge.innerText = isMotion ? 'MOTION' : 'STATIC';
+            statusBadge.className = `calc-val status ${isMotion ? '' : 'prev'}`;
+
+            // Push current value to single pixel time-series history
+            pixelHistory.push(currVal);
+            if (pixelHistory.length > 50) pixelHistory.shift();
+        }
+
+        function updatePixelTracerGraph() {
+            const w = canvasTracer.width = canvasTracer.parentElement.clientWidth;
+            const h = canvasTracer.height = canvasTracer.parentElement.clientHeight;
+
+            ctxTracer.clearRect(0, 0, w, h);
+
+            // Draw grid lines
+            ctxTracer.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctxTracer.lineWidth = 1;
+            for (let y = 0; y < h; y += 30) {
+                ctxTracer.beginPath(); ctxTracer.moveTo(0, y); ctxTracer.lineTo(w, y); ctxTracer.stroke();
+            }
+
+            // Plot pixel intensity waveform
+            ctxTracer.strokeStyle = '#00f0ff';
+            ctxTracer.lineWidth = 2;
+            ctxTracer.beginPath();
+
+            let stepX = w / (pixelHistory.length - 1);
+            for (let i = 0; i < pixelHistory.length; i++) {
+                let val = pixelHistory[i];
+                let yPos = h - (val / 255.0) * (h - 20) - 10;
+                let xPos = i * stepX;
+
+                if (i === 0) ctxTracer.moveTo(xPos, yPos);
+                else ctxTracer.lineTo(xPos, yPos);
+            }
+            ctxTracer.stroke();
+
+            // Glow point on current intensity
+            let currentVal = pixelHistory[pixelHistory.length - 1];
+            let currentY = h - (currentVal / 255.0) * (h - 20) - 10;
+            ctxTracer.fillStyle = '#ec4899';
+            ctxTracer.beginPath();
+            ctxTracer.arc(w - 4, currentY, 4, 0, Math.PI * 2);
+            ctxTracer.fill();
+        }
+
+        /* ==========================================================================
+           STATISTICS & FPS COUNTER
+           ========================================================================== */
+        function updateLiveStats(changedPixels, totalPixels) {
+            let motionPercent = ((changedPixels / totalPixels) * 100).toFixed(1);
+
+            document.getElementById('statChangedPixels').innerText = changedPixels.toLocaleString();
+            document.getElementById('statMotionPercent').innerText = `${motionPercent}%`;
+            document.getElementById('barMotionPercent').style.width = `${Math.min(100, motionPercent * 3)}%`;
+            document.getElementById('statThreshold').innerText = thresholdValue;
+
+            const stateBadge = document.getElementById('statMotionState');
+            if (motionPercent > 1.5) {
+                stateBadge.innerText = 'MOTION DETECTED';
+                stateBadge.style.color = 'var(--green-glow)';
+            } else {
+                stateBadge.innerText = 'SCENE STATIC';
+                stateBadge.style.color = 'var(--text-muted)';
+            }
+
+            // Foreground detected badge for Background Subtraction
+            const fgBadge = document.getElementById('fgDetectedBadge');
+            fgBadge.innerText = motionPercent > 2.0 ? `YES (${motionPercent}%)` : `NO (0%)`;
+            fgBadge.style.color = motionPercent > 2.0 ? 'var(--green-glow)' : 'var(--text-muted)';
+        }
+
+        function calculateFPS() {
+            const now = performance.now();
+            if (now - lastFpsTime >= 1000) {
+                currentFps = frameCount;
+                frameCount = 0;
+                lastFpsTime = now;
+                document.getElementById('statFPS').innerText = `${currentFps} FPS`;
+            }
+        }
+
+        /* ==========================================================================
+           INTERACTIVE EVENT HANDLERS & CONTROLS
+           ========================================================================== */
+
+        // Start / Stop Camera
+        document.getElementById('btnStartCamera').addEventListener('click', startWebcam);
+        document.getElementById('btnStopCamera').addEventListener('click', stopWebcam);
+        document.getElementById('btnSampleMotion').addEventListener('click', () => {
+            stopWebcam();
+            startSampleMode();
+        });
+
+        // Threshold Slider
+        const rangeThreshold = document.getElementById('rangeThreshold');
+        rangeThreshold.addEventListener('input', (e) => {
+            thresholdValue = parseInt(e.target.value);
+            document.getElementById('valThreshold').innerText = thresholdValue;
+            updatePipelineHighlight();
+        });
+
+        // Alpha Temporal Slider
+        const rangeAlpha = document.getElementById('rangeAlpha');
+        rangeAlpha.addEventListener('input', (e) => {
+            alphaValue = parseFloat(e.target.value);
+            document.getElementById('valAlpha').innerText = alphaValue.toFixed(2);
+        });
+
+        // Ghost Styles
+        document.getElementById('btnGhostCyan').addEventListener('click', function() {
+            setGhostStyle('cyan', this);
+        });
+        document.getElementById('btnGhostHeatmap').addEventListener('click', function() {
+            setGhostStyle('heatmap', this);
+        });
+        document.getElementById('btnGhostBinary').addEventListener('click', function() {
+            setGhostStyle('binary', this);
+        });
+
+        function setGhostStyle(style, btn) {
+            ghostStyle = style;
+            document.querySelectorAll('#btnGhostCyan, #btnGhostHeatmap, #btnGhostBinary').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        // Mode Selector Tabs
+        const tabFrameDiff = document.getElementById('tabFrameDiff');
+        const tabTemporalAvg = document.getElementById('tabTemporalAvg');
+        const tabBgSubtract = document.getElementById('tabBgSubtract');
+        const tabOpticalFlow = document.getElementById('tabOpticalFlow');
+
+        const modeTabs = [tabFrameDiff, tabTemporalAvg, tabBgSubtract, tabOpticalFlow];
+
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                modeTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                if (tab === tabFrameDiff) {
+                    activeMode = 'framediff';
+                    updateEduText("Frame Difference compares consecutive frames t and t-1 to reveal instantaneous motion.");
+                } else if (tab === tabTemporalAvg) {
+                    activeMode = 'temporalavg';
+                    updateEduText("Temporal Averaging combines multiple frames over time to reduce random noise.");
+                } else if (tab === tabBgSubtract) {
+                    activeMode = 'bgsubtract';
+                    updateEduText("Background Subtraction compares the current frame against a stored background frame.");
+                } else if (tab === tabOpticalFlow) {
+                    activeMode = 'opticalflow';
+                    updateEduText("Optical Flow estimates the vector direction and speed of pixel motion across time.");
+                }
+                updatePipelineHighlight();
+            });
+        });
+
+        function updateEduText(text) {
+            document.getElementById('dynamicEduExplanation').innerText = text;
+        }
+
+        function updatePipelineHighlight() {
+            document.querySelectorAll('.pipeline-node').forEach(n => n.classList.remove('active'));
+            document.getElementById('pNodeVideo').classList.add('active');
+            document.getElementById('pNodeCurr').classList.add('active');
+
+            if (activeMode === 'framediff') {
+                document.getElementById('pNodePrev').classList.add('active');
+                document.getElementById('pNodeDiff').classList.add('active');
+                document.getElementById('pNodeThresh').classList.add('active');
+                document.getElementById('pNodeGhost').classList.add('active');
+            } else if (activeMode === 'opticalflow') {
+                document.getElementById('pNodeDiff').classList.add('active');
+                document.getElementById('pNodeInfo').classList.add('active');
+            }
+        }
+
+        // Background Subtraction Capture & Reset
+        document.getElementById('btnCapBg').addEventListener('click', () => {
+            offCtxBg.drawImage(offCanvasCurr, 0, 0);
+            hasCapturedBg = true;
+            alert("Captured current frame as stationary background baseline!");
+        });
+        document.getElementById('btnResetBg').addEventListener('click', () => {
+            hasCapturedBg = false;
+            alert("Reset stored background frame.");
+        });
+
+        // "Who Moved?" Experiment Triggers
+        document.getElementById('btnSimObjectMove').addEventListener('click', () => {
+            simBallVx = 8; simBallVy = 6;
+            document.getElementById('whoMovedStatus').innerText = "Status: Localized object motion detected.";
+            document.getElementById('whoMovedStatus').style.color = "var(--cyan-glow)";
+        });
+        document.getElementById('btnSimCamMove').addEventListener('click', () => {
+            simCamShakeX = 25;
+            document.getElementById('whoMovedStatus').innerText = "Status: Global camera shift! Entire frame changed!";
+            document.getElementById('whoMovedStatus').style.color = "var(--amber-glow)";
+        });
+
+        // Computer View Mode Toggle
+        document.getElementById('btnComputerView').addEventListener('click', function() {
+            isComputerView = !isComputerView;
+            document.body.classList.toggle('computer-view-active', isComputerView);
+            this.innerText = isComputerView ? '🤖 Computer View' : '👁 Human View';
+            this.className = `btn ${isComputerView ? 'btn-purple' : 'btn-outline'}`;
+        });
+
+        // Reset App State
+        document.getElementById('btnReset').addEventListener('click', () => {
+            thresholdValue = 35;
+            rangeThreshold.value = 35;
+            document.getElementById('valThreshold').innerText = '35';
+            alphaValue = 0.25;
+            rangeAlpha.value = 0.25;
+            document.getElementById('valAlpha').innerText = '0.25';
+            tabFrameDiff.click();
+            setGhostStyle('cyan', document.getElementById('btnGhostCyan'));
+        });
+
+        // Pixel Inspector Canvas Hover Listener
+        const diffWrapper = document.getElementById('diffCanvasWrapper');
+        const reticle = document.getElementById('inspectorReticle');
+
+        diffWrapper.addEventListener('mousemove', (e) => {
+            const rect = canvasDifference.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            inspectX = Math.floor((mouseX / rect.width) * PROC_W);
+            inspectY = Math.floor((mouseY / rect.height) * PROC_H);
+
+            reticle.style.display = 'block';
+            reticle.style.left = `${mouseX}px`;
+            reticle.style.top = `${mouseY}px`;
+        });
+
+        diffWrapper.addEventListener('mouseleave', () => {
+            reticle.style.display = 'none';
+        });
+
+        document.getElementById('btnTracePixel').addEventListener('click', () => {
+            alert(`Tracing Pixel intensity at (X: ${inspectX}, Y: ${inspectY}) on live waveform graph below!`);
+        });
+
+        /* ==========================================================================
+           CLASSROOM CHALLENGE QUIZ SYSTEM
+           ========================================================================== */
+        const quizQuestions = [
+            {
+                q: "If nothing moves in front of the camera, what should the difference image look like?",
+                options: ["Solid bright white", "Mostly black / near zero intensity", "Random rainbow noise", "Identical to current frame"],
+                answer: 1,
+                explain: "When consecutive frames are identical, I(t) - I(t-1) = 0 for all pixels, resulting in a black image."
+            },
+            {
+                q: "What happens when the Motion Threshold (T) parameter is increased?",
+                options: ["Small pixel changes are ignored", "The camera frame rate increases", "Static objects start glowing", "Background noise increases"],
+                answer: 0,
+                explain: "A higher threshold requires larger pixel intensity changes before classifying them as motion."
+            },
+            {
+                q: "If the camera shakes or moves, will Frame Difference detect motion?",
+                options: ["No, it only detects human hands", "Yes, because many background pixels change intensity", "Only if the room is dark", "Only when using background subtraction"],
+                answer: 1,
+                explain: "Frame difference measures pixel change regardless of cause. Global camera movement changes all pixels!"
+            },
+            {
+                q: "What distinguishes Temporal Filtering from Spatial Filtering?",
+                options: ["Temporal uses spatial blur", "Temporal uses information across multiple points in TIME", "Spatial requires a GPU", "Temporal only works in grayscale"],
+                answer: 1,
+                explain: "Spatial filtering compares neighboring pixels in space; temporal filtering compares the same pixel across time."
+            }
+        ];
+
+        let quizIndex = 0;
+        let quizScore = 0;
+
+        const quizModal = document.getElementById('quizModal');
+        document.getElementById('btnQuiz').addEventListener('click', () => {
+            quizIndex = 0; quizScore = 0;
+            showQuestion();
+            quizModal.classList.add('show');
+        });
+        document.getElementById('btnCloseQuiz').addEventListener('click', () => {
+            quizModal.classList.remove('show');
+        });
+
+        function showQuestion() {
+            const qData = quizQuestions[quizIndex];
+            document.getElementById('quizQuestionText').innerText = `Q${quizIndex + 1}: ${qData.q}`;
+            const container = document.getElementById('quizOptionsContainer');
+            container.innerHTML = '';
+            
+            const feedback = document.getElementById('quizFeedback');
+            feedback.style.display = 'none';
+
+            qData.options.forEach((opt, idx) => {
+                const btn = document.createElement('div');
+                btn.className = 'quiz-option';
+                btn.innerText = `${String.fromCharCode(65 + idx)}) ${opt}`;
+                btn.addEventListener('click', () => checkAnswer(idx, qData.answer, qData.explain, btn));
+                container.appendChild(btn);
+            });
+
+            document.getElementById('quizScoreText').innerText = `Score: ${quizScore} / ${quizQuestions.length}`;
+        }
+
+        function checkAnswer(selected, correct, explain, element) {
+            const container = document.getElementById('quizOptionsContainer');
+            const options = container.querySelectorAll('.quiz-option');
+            options.forEach(opt => opt.style.pointerEvents = 'none');
+
+            const feedback = document.getElementById('quizFeedback');
+            feedback.style.display = 'block';
+
+            if (selected === correct) {
+                element.classList.add('correct');
+                quizScore++;
+                feedback.innerText = `✓ Correct! ${explain}`;
+                feedback.style.background = 'rgba(16, 185, 129, 0.2)';
+                feedback.style.color = 'var(--green-glow)';
+            } else {
+                element.classList.add('incorrect');
+                options[correct].classList.add('correct');
+                feedback.innerText = `✗ Incorrect. ${explain}`;
+                feedback.style.background = 'rgba(239, 68, 68, 0.2)';
+                feedback.style.color = '#ef4444';
+            }
+            document.getElementById('quizScoreText').innerText = `Score: ${quizScore} / ${quizQuestions.length}`;
+        }
+
+        document.getElementById('btnNextQuiz').addEventListener('click', () => {
+            quizIndex = (quizIndex + 1) % quizQuestions.length;
+            showQuestion();
+        });
+
+        // Initialize Engine
+        requestAnimationFrame(processFrame);
+    </script>
+</body>
+</html>
